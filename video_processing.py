@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 
 from aiogram.types import Message, FSInputFile
+from aiogram.exceptions import TelegramBadRequest
 
 import metrics_db
 
@@ -28,6 +29,17 @@ async def get_duration(path: str) -> float:
 def progress_bar(percent: int, size: int = 10) -> str:
     filled = int(size * percent / 100)
     return "▓" * filled + "░" * (size - filled)
+
+
+async def _safe_edit_status(status_msg, text: str) -> None:
+    if status_msg is None:
+        return
+    try:
+        await status_msg.edit_text(text)
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            return
+        raise
 
 
 def _build_ffmpeg_cmd(input_file: str, output_file: str, duration: float, effect: str) -> str:
@@ -252,7 +264,7 @@ async def convert_video_to_circle(message: Message, bot, effect: str = "normal")
             if time.time() - start_time > 300:
                 process.kill()
                 await process.wait()
-                await status_msg.edit_text("❌ Обработка заняла больше 5 минут. Пришли другое видео.")
+                await _safe_edit_status(status_msg, "❌ Обработка заняла больше 5 минут. Пришли другое видео.")
                 if user_id:
                     metrics_db.log_event(
                         user_id,
@@ -282,17 +294,14 @@ async def convert_video_to_circle(message: Message, bot, effect: str = "normal")
                 now = time.time()
                 if now - last_update >= 1:  # обновление не чаще 1 раза в секунду
                     bar = progress_bar(percent)
-                    await status_msg.edit_text(
-                        f"⏳ Обрабатываю видео…\n"
-                        f"{bar} {percent}%"
-                    )
+                    await _safe_edit_status(status_msg, f"⏳ Обрабатываю видео…\n{bar} {percent}%")
                     last_update = now
 
         await process.wait()
 
         # 6) если ошибка — пишем пользователю
         if process.returncode != 0:
-            await status_msg.edit_text("❌ Ошибка обработки видео")
+            await _safe_edit_status(status_msg, "❌ Ошибка обработки видео")
             if user_id:
                 metrics_db.log_event(
                     user_id,
@@ -319,7 +328,7 @@ async def convert_video_to_circle(message: Message, bot, effect: str = "normal")
             )
 
         # 8) обновляем статус
-        await status_msg.edit_text("✅ Готово! Вот твой кружок ⭕️")
+        await _safe_edit_status(status_msg, "✅ Готово! Вот твой кружок ⭕️")
 
     except Exception as e:
         if user_id:
@@ -333,7 +342,7 @@ async def convert_video_to_circle(message: Message, bot, effect: str = "normal")
                 error=str(e)[:500],
             )
         if status_msg is not None:
-            await status_msg.edit_text("❌ Ошибка обработки видео")
+            await _safe_edit_status(status_msg, "❌ Ошибка обработки видео")
         return
     finally:
         # 9) удаляем временные файлы
