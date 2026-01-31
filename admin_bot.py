@@ -2,6 +2,7 @@ import asyncio
 import os
 from datetime import datetime
 
+from aiohttp import web
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command
 from aiogram.client.session.aiohttp import AiohttpSession
@@ -227,12 +228,29 @@ async def ignore_non_commands(message: Message):
     await message.answer("Напиши /stats")
 
 
+async def _start_health_server() -> web.AppRunner:
+    async def health(_: web.Request) -> web.Response:
+        return web.Response(text="ok")
+
+    app = web.Application()
+    app.router.add_get("/health", health)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    port = int(os.getenv("PORT", "10000"))
+    site = web.TCPSite(runner, host="0.0.0.0", port=port)
+    await site.start()
+    return runner
+
+
 async def main() -> None:
     if not ADMIN_BOT_TOKEN:
         raise RuntimeError("ADMIN_BOT_TOKEN is not set")
     if not ADMIN_ID:
         raise RuntimeError("ADMIN_ID is not set")
 
+    health_runner = await _start_health_server()
     metrics_db.init_db()
 
     session = AiohttpSession(timeout=60)
@@ -257,6 +275,7 @@ async def main() -> None:
 
         await dp.start_polling(bot)
     finally:
+        await health_runner.cleanup()
         await bot.session.close()
 
 

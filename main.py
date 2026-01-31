@@ -1,5 +1,7 @@
 import asyncio
+import os
 
+from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.exceptions import TelegramNetworkError
@@ -18,7 +20,24 @@ dp = Dispatcher()
 dp.include_router(router)
 
 
+async def _start_health_server() -> web.AppRunner:
+    async def health(_: web.Request) -> web.Response:
+        return web.Response(text="ok")
+
+    app = web.Application()
+    app.router.add_get("/health", health)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    port = int(os.getenv("PORT", "10000"))
+    site = web.TCPSite(runner, host="0.0.0.0", port=port)
+    await site.start()
+    return runner
+
+
 async def main():
+    health_runner = await _start_health_server()
     metrics_db.init_db()
     # Warm up connection + retries for unstable networks on Windows (WinError 121)
     last_exc: Exception | None = None
@@ -37,6 +56,7 @@ async def main():
     try:
         await dp.start_polling(bot)
     finally:
+        await health_runner.cleanup()
         await bot.session.close()
 
 
