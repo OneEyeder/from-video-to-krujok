@@ -129,7 +129,7 @@ def _build_ffmpeg_cmd(input_file: str, output_file: str, duration: float, effect
 
             return (
                 f"ffmpeg -y -i \"{input_file}\" -stream_loop -1 -i \"{flash_file_str}\" "
-                f"-filter_complex \"{fc}\" -map \"[v]\" -map 0:a "
+                f"-filter_complex \"{fc}\" -map \"[v]\" -map 0:a? "
                 f"-t 60 -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k \"{output_file}\""
             )
 
@@ -343,7 +343,7 @@ async def convert_video_to_circle(message: Message, bot, effect: str = "normal")
                     effect=effect,
                     video_duration=float(video.duration) if video.duration is not None else None,
                     video_file_size=int(video.file_size) if video.file_size is not None else None,
-                    error=("ffmpeg_nonzero_returncode\n" + tail)[:500],
+                    error=("ffmpeg_nonzero_returncode\n" + tail)[-500:],
                 )
             return
 
