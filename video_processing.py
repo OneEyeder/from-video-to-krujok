@@ -123,7 +123,7 @@ def _build_ffmpeg_cmd(input_file: str, output_file: str, duration: float, effect
 
             fc = (
                 f"[0:v]{base},trim=0:{effective_duration},setpts=PTS-STARTPTS[v0];"
-                f"[1:v]{base},trim=0:{flash_len},setpts=PTS-STARTPTS+{flash_start}/TB[fv];"
+                f"[1:v]{base},trim=0:{flash_len},setpts=PTS-STARTPTS[fv];"
                 f"[v0][fv]overlay=0:0:enable='between(t,{flash_start},{flash_end})'[v]"
             )
 
@@ -287,7 +287,7 @@ async def convert_video_to_circle(message: Message, bot, effect: str = "normal")
 
         start_time = time.time()
 
-        stderr_tail: collections.deque[str] = collections.deque(maxlen=25)
+        stderr_tail: collections.deque[str] = collections.deque(maxlen=200)
 
         while True:
             if time.time() - start_time > 300:
@@ -336,6 +336,10 @@ async def convert_video_to_circle(message: Message, bot, effect: str = "normal")
             await _safe_edit_status(status_msg, "❌ Ошибка обработки видео")
             if user_id:
                 tail = "\n".join([t for t in stderr_tail if t])
+                print("ffmpeg failed", process.returncode)
+                print("ffmpeg cmd:", cmd)
+                if tail:
+                    print("ffmpeg stderr tail:\n" + tail)
                 metrics_db.log_event(
                     user_id,
                     "video_error",
@@ -343,7 +347,7 @@ async def convert_video_to_circle(message: Message, bot, effect: str = "normal")
                     effect=effect,
                     video_duration=float(video.duration) if video.duration is not None else None,
                     video_file_size=int(video.file_size) if video.file_size is not None else None,
-                    error=("ffmpeg_nonzero_returncode\n" + tail)[-500:],
+                    error=("ffmpeg_nonzero_returncode\n" + tail)[-2000:],
                 )
             return
 
