@@ -124,18 +124,12 @@ def _build_ffmpeg_cmd(input_file: str, output_file: str, duration: float, effect
             fc = (
                 f"[0:v]{base},trim=0:{effective_duration},setpts=PTS-STARTPTS[v0];"
                 f"[1:v]{base},trim=0:{flash_len},setpts=PTS-STARTPTS+{flash_start}/TB[fv];"
-                f"[v0][fv]overlay=0:0:enable='between(t,{flash_start},{flash_end})'[v];"
-                f"[0:a]atrim=0:{effective_duration},asetpts=PTS-STARTPTS[a0];"
-                f"[a0]asplit=2[apre][apost];"
-                f"[apre]atrim=0:{flash_start},asetpts=PTS-STARTPTS[apre_t];"
-                f"[apost]atrim={flash_end}:{effective_duration},asetpts=PTS-STARTPTS[apost_t];"
-                f"[1:a]atrim=0:{flash_len},asetpts=PTS-STARTPTS[fa];"
-                f"[apre_t][fa][apost_t]concat=n=3:v=0:a=1[a]"
+                f"[v0][fv]overlay=0:0:enable='between(t,{flash_start},{flash_end})'[v]"
             )
 
             return (
                 f"ffmpeg -y -i \"{input_file}\" -stream_loop -1 -i \"{flash_file_str}\" "
-                f"-filter_complex \"{fc}\" -map \"[v]\" -map \"[a]\" "
+                f"-filter_complex \"{fc}\" -map \"[v]\" -map 0:a "
                 f"-t 60 -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k \"{output_file}\""
             )
 
