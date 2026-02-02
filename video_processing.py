@@ -122,6 +122,7 @@ def _build_ffmpeg_cmd(input_file: str, output_file: str, duration: float, effect
 
             flash_file_str = str(flash_file)
 
+            # Overlay only video from the flash clip; keep original audio.
             fc = (
                 f"[0:v]{base},trim=0:{effective_duration},setpts=PTS-STARTPTS[v0];"
                 f"[1:v]{base},trim=0:{flash_len},setpts=PTS-STARTPTS[fv];"
