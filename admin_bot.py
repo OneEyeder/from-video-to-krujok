@@ -229,6 +229,10 @@ async def ignore_non_commands(message: Message):
 
 
 async def _start_health_server() -> web.AppRunner:
+    port_str = os.getenv("PORT")
+    if not port_str:
+        raise RuntimeError("Health server disabled: PORT is not set")
+
     async def health(_: web.Request) -> web.Response:
         return web.Response(text="ok")
 
@@ -238,7 +242,7 @@ async def _start_health_server() -> web.AppRunner:
     runner = web.AppRunner(app)
     await runner.setup()
 
-    port = int(os.getenv("PORT", "10000"))
+    port = int(port_str)
     site = web.TCPSite(runner, host="0.0.0.0", port=port)
     await site.start()
     return runner
@@ -250,7 +254,11 @@ async def main() -> None:
     if not ADMIN_ID:
         raise RuntimeError("ADMIN_ID is not set")
 
-    health_runner = await _start_health_server()
+    health_runner: web.AppRunner | None = None
+    try:
+        health_runner = await _start_health_server()
+    except Exception:
+        health_runner = None
     metrics_db.init_db()
 
     session = AiohttpSession(timeout=60)
@@ -275,7 +283,8 @@ async def main() -> None:
 
         await dp.start_polling(bot)
     finally:
-        await health_runner.cleanup()
+        if health_runner is not None:
+            await health_runner.cleanup()
         await bot.session.close()
 
 

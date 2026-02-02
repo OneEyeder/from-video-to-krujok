@@ -21,6 +21,10 @@ dp.include_router(router)
 
 
 async def _start_health_server() -> web.AppRunner:
+    port_str = os.getenv("PORT")
+    if not port_str:
+        raise RuntimeError("Health server disabled: PORT is not set")
+
     async def health(_: web.Request) -> web.Response:
         return web.Response(text="ok")
 
@@ -30,14 +34,18 @@ async def _start_health_server() -> web.AppRunner:
     runner = web.AppRunner(app)
     await runner.setup()
 
-    port = int(os.getenv("PORT", "10000"))
+    port = int(port_str)
     site = web.TCPSite(runner, host="0.0.0.0", port=port)
     await site.start()
     return runner
 
 
 async def main():
-    health_runner = await _start_health_server()
+    health_runner: web.AppRunner | None = None
+    try:
+        health_runner = await _start_health_server()
+    except Exception:
+        health_runner = None
     metrics_db.init_db()
     # Warm up connection + retries for unstable networks on Windows (WinError 121)
     last_exc: Exception | None = None
@@ -56,7 +64,8 @@ async def main():
     try:
         await dp.start_polling(bot)
     finally:
-        await health_runner.cleanup()
+        if health_runner is not None:
+            await health_runner.cleanup()
         await bot.session.close()
 
 
