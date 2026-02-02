@@ -59,6 +59,7 @@ async def _safe_edit_status(status_msg, text: str) -> None:
 
 def _build_ffmpeg_cmd(input_file: str, output_file: str, duration: float, effect: str, *, with_audio: bool) -> str:
     effective_duration = min(duration, 60.0)
+    out_duration = effective_duration
     end_start = max(effective_duration - 2.0, 0.0)
     meme_start = max(effective_duration - 0.5, 0.0)
 
@@ -103,7 +104,7 @@ def _build_ffmpeg_cmd(input_file: str, output_file: str, duration: float, effect
             return (
                 f"ffmpeg -y -i \"{input_file}\" "
                 f"-filter_complex \"{fc}\" -map \"[v]\" -map \"[a]\" "
-                f"-t 60 -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k \"{output_file}\""
+                f"-t {out_duration} -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k \"{output_file}\""
             )
 
     if effect == "flash":
@@ -130,7 +131,7 @@ def _build_ffmpeg_cmd(input_file: str, output_file: str, duration: float, effect
             return (
                 f"ffmpeg -y -i \"{input_file}\" -stream_loop -1 -i \"{flash_file_str}\" "
                 f"-filter_complex \"{fc}\" -map \"[v]\" -map 0:a? "
-                f"-t 60 -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k \"{output_file}\""
+                f"-t {out_duration} -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k \"{output_file}\""
             )
 
     if effect == "speed":
@@ -150,7 +151,7 @@ def _build_ffmpeg_cmd(input_file: str, output_file: str, duration: float, effect
             return (
                 f"ffmpeg -y -i \"{input_file}\" "
                 f"-filter_complex \"{fc}\" -map \"[v]\" -map \"[a]\" "
-                f"-t 60 -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k \"{output_file}\""
+                f"-t {out_duration} -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k \"{output_file}\""
             )
 
     if effect == "meme":
@@ -176,7 +177,7 @@ def _build_ffmpeg_cmd(input_file: str, output_file: str, duration: float, effect
     return (
         f"ffmpeg -y -i \"{input_file}\" "
         f"-vf \"{vf}\" "
-        f"-t 60 "
+        f"-t {out_duration} "
         f"-c:v libx264 -preset veryfast -crf 23 "
         f"{audio_part}"
         f"\"{output_file}\""
@@ -197,6 +198,8 @@ def _get_memes_dir() -> Path | None:
 
 def _build_meme_insert_cmd(input_file: str, output_file: str, duration: float, *, with_audio: bool) -> str:
     effective_duration = min(duration, 60.0)
+    meme_len = 5.0
+    out_duration = min(60.0, effective_duration + meme_len)
     if not with_audio:
         return _build_ffmpeg_cmd(input_file, output_file, duration, "normal", with_audio=False)
 
@@ -207,7 +210,6 @@ def _build_meme_insert_cmd(input_file: str, output_file: str, duration: float, *
 
     meme_file = str(random.choice(meme_files))
 
-    meme_len = 5.0
     insert_at = random.uniform(0.0, effective_duration) if effective_duration > 0 else 0.0
 
     base = "crop='min(iw,ih)':'min(iw,ih)',scale=480:480"
@@ -232,7 +234,7 @@ def _build_meme_insert_cmd(input_file: str, output_file: str, duration: float, *
     return (
         f"ffmpeg -y -i \"{input_file}\" -stream_loop -1 -i \"{meme_file}\" "
         f"-filter_complex \"{fc}\" -map \"[v]\" -map \"[a]\" "
-        f"-t 60 -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k \"{output_file}\""
+        f"-t {out_duration} -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k \"{output_file}\""
     )
 
 
